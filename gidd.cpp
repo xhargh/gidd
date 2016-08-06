@@ -4,7 +4,6 @@
 
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <vector>
 #include <set>
 #include <map>
@@ -37,6 +36,7 @@ void generateDot(
 
     if (clusters) {
         int clusterNum = 0;
+
         for (auto &a : paths) {
             bool matchFilter = false;
             for (auto &f : filters) {
@@ -49,7 +49,6 @@ void generateDot(
                 os << "subgraph cluster_" << clusterNum << "{" << endl;
                 os << "label = \"" << a.first << "\";" << endl;
                 for (auto &b : a.second) {
-                    // os << a.first << " " << b << endl;
                     os << "\"" << b << "\";" << endl;
                 }
                 os << "}" << endl;
@@ -69,8 +68,8 @@ void generateDot(
             }
         }
         if (!matchFilter) {
-            __cxx11::string headerModifier = " [shape=box, style=filled, color=lightblue]";
-            __cxx11::string linkModifier=" [len=5]";
+            string headerModifier = " [shape=box, style=filled, color=lightblue]";
+            string linkModifier=" [overlap=scale]";
 
             if (fromFileToPath[p.first].compare("") == 0)
             {
@@ -98,9 +97,42 @@ void generatePlantUml(
     ostream os(&fb);
 
     os << "@startuml" << endl;
-
     if (clusters) {
         os << "\tset namespaceSeparator ::" << endl;
+    }
+    else {
+        os << "\tset namespaceSeparator none" << endl;
+    }
+    os << "\thide members" << endl;
+
+    for (auto &a : paths) {
+        bool matchFilter = false;
+        for (auto &f : filters) {
+            if (f.compare(a.first) == 0) {
+                matchFilter = true;
+            }
+        }
+        if (!matchFilter) {
+
+            for (auto &b : a.second) {
+                string file = b;
+
+                bool isHeader = false;
+                size_t lastdot = file.find_last_of(".");
+                if (lastdot == string::npos || file.find("h", lastdot) != string::npos || file.find("H", lastdot) != string::npos)
+                {
+                    isHeader = true;
+                }
+
+                if (clusters) {
+                    string path = fromFileToPath[file];
+                    string fullPath = path + "/" + file;
+                    file = ReplaceString(fullPath, "/", "::");
+                }
+
+                os << "\tclass \"" << file << "\" " << (isHeader?"<< (h,lightgreen) >>":"") << endl;
+            }
+        }
     }
 
     for (auto& p : pairs)
@@ -114,7 +146,6 @@ void generatePlantUml(
             }
         }
         if (!matchFilter) {
-            // os << "\t" << "\"" << p.first << "\"" << endl;
             string from = p.first;
             string to = p.second;
             if (clusters) {
@@ -164,9 +195,7 @@ int main() {
 
     for (auto& l : lines)
     {
-        // cout << l << endl;
-
-        int level = l.find(" ");
+        size_t level = l.find(" ");
         string file;
 
         if (l.at(0) == '[') {
