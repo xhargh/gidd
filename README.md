@@ -72,5 +72,5 @@ output.dot:
 ![Hello world dot](doc/examples/output_dot.png "dot example")
 output_no_clusters.puml:
 ![Hello world plantuml no clusters](doc/examples/output_no_clusters.png "plantuml no clusters example")
-output.dot:
+output.puml:
 ![Hello world plantuml](doc/examples/output.png "dot example")
