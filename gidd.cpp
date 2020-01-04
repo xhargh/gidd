@@ -20,6 +20,36 @@ string ReplaceString(string subject, const string& search,
   return subject;
 }
 
+bool checkPathFilter(const string a, const vector<string> &filters) {
+  for (auto &f : filters) {
+    if (a.substr(0, f.size()) == f) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool checkPairs(
+  const pair<string, string> &p,
+  const map<string, string> &fromFileToPath,
+  const vector<string> &filters) {
+
+  auto firstPath = fromFileToPath.find(p.first);
+  auto secondPath = fromFileToPath.find(p.second);
+
+  for (auto &f : filters)
+  {
+    if (
+      ((firstPath != fromFileToPath.end()) && (firstPath->second.substr(0, f.size()) == f))
+      ||
+      ((secondPath != fromFileToPath.end()) && (secondPath->second.substr(0, f.size()) == f))
+      ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void generateDot(
   const string &outputFile,
   const vector<string> &filters,
@@ -38,12 +68,8 @@ void generateDot(
     int clusterNum = 0;
 
     for (auto &a : paths) {
-      bool matchFilter = false;
-      for (auto &f : filters) {
-        if (a.first.substr(0, f.size()) == f) {
-          matchFilter = true;
-        }
-      }
+      bool matchFilter = checkPathFilter(a.first, filters);
+
       if (!matchFilter) {
         os << "subgraph cluster_" << clusterNum << "{" << endl;
         os << "label = \"" << a.first << "\";" << endl;
@@ -58,17 +84,8 @@ void generateDot(
 
   for (auto& p : pairs)
   {
-    bool matchFilter = false;
-    for (auto &f : filters)
-    {
-      if (
-        (fromFileToPath[p.first].substr(0, f.size()) == f)
-        ||
-        (fromFileToPath[p.second].substr(0, f.size()) == f)
-        ) {
-        matchFilter = true;
-      }
-    }
+    bool matchFilter = checkPairs(p, fromFileToPath, filters);
+
     if (!matchFilter) {
       string headerModifier = " [shape=box, style=filled, color=lightblue]";
       string linkModifier=" [overlap=scale]";
@@ -108,12 +125,8 @@ void generatePlantUml(
   os << "\thide members" << endl;
 
   for (auto &a : paths) {
-    bool matchFilter = false;
-    for (auto &f : filters) {
-      if (a.first.substr(0, f.size()) == f) {
-        matchFilter = true;
-      }
-    }
+    bool matchFilter = checkPathFilter(a.first, filters);
+
     if (!matchFilter) {
 
       for (auto &b : a.second) {
@@ -139,18 +152,8 @@ void generatePlantUml(
 
   for (auto& p : pairs)
   {
-    bool matchFilter = false;
-    for (auto &f : filters)
-    {
-      if (
-        (fromFileToPath[p.first].substr(0, f.size()) == f)
-        ||
-        (fromFileToPath[p.second].substr(0, f.size()) == f)
-        )
-      {
-        matchFilter = true;
-      }
-    }
+    bool matchFilter = checkPairs(p, fromFileToPath, filters);
+
     if (!matchFilter) {
       string from = p.first;
       string to = p.second;
