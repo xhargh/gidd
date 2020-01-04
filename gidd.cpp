@@ -40,7 +40,7 @@ void generateDot(
         for (auto &a : paths) {
             bool matchFilter = false;
             for (auto &f : filters) {
-                if (f.compare(a.first) == 0) {
+                if (a.first.substr(0, f.size()) == f) {
                     matchFilter = true;
                 }
             }
@@ -62,8 +62,11 @@ void generateDot(
         bool matchFilter = false;
         for (auto &f : filters)
         {
-            if (f.compare(fromFileToPath[p.first]) == 0 || f.compare(fromFileToPath[p.second]) == 0)
-            {
+            if (
+              (fromFileToPath[p.first].substr(0, f.size()) == f)
+              ||
+              (fromFileToPath[p.second].substr(0, f.size()) == f)
+            ) {
                 matchFilter = true;
             }
         }
@@ -108,8 +111,8 @@ void generatePlantUml(
     for (auto &a : paths) {
         bool matchFilter = false;
         for (auto &f : filters) {
-            if (f.compare(a.first) == 0) {
-                matchFilter = true;
+            if (a.first.substr(0, f.size()) == f) {
+              matchFilter = true;
             }
         }
         if (!matchFilter) {
@@ -140,7 +143,11 @@ void generatePlantUml(
         bool matchFilter = false;
         for (auto &f : filters)
         {
-            if (f.compare(fromFileToPath[p.first]) == 0 || f.compare(fromFileToPath[p.second]) == 0)
+            if (
+              (fromFileToPath[p.first].substr(0, f.size()) == f)
+              ||
+              (fromFileToPath[p.second].substr(0, f.size()) == f)
+              )
             {
                 matchFilter = true;
             }
@@ -173,15 +180,20 @@ int main() {
     const string filterFileName = "filter.txt";
     const string outputFile = "output"; // extension is added later
 
+    // Read input
     ifstream infile(inputFileName);
     while (getline(infile, line))
     {
         auto firstchar = line.at(0);
-        if (firstchar == '.' || (firstchar == '[' && (line.find("Building CXX object")!=string::npos || line.find("Building C object")!=string::npos))) {
+        if (firstchar == '.'
+        || (firstchar == '['
+        && (
+          line.find("Building CXX object") != string::npos || line.find("Building C object") != string::npos))) {
             lines.push_back(line);
         }
     }
 
+    // Read filters
     vector<string> filters;
     ifstream filterFile(filterFileName);
     while (getline(filterFile, line))
@@ -202,6 +214,7 @@ int main() {
             level = 0;
 
             file = l.substr(l.find_last_of("/")+1); // remove everything up to last /
+            // TODO: add support for other extensions than .o
             file = file.substr(0, file.length()-2); // remove ".o"
 
             fromFileToPath[file] = "";
