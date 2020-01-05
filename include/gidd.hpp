@@ -9,6 +9,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include "gidd_utils.hpp"
 
 struct File {
   std::string name;
@@ -16,7 +17,7 @@ struct File {
   std::set<std::shared_ptr<File>> includes;
 public:
   File(std::string name, std::string path) : name(name), path(path) {}
-  static std::string FullPath(std::string path, std::string name) {
+  static std::string FullPath(const std::string path, const std::string name) {
     return (path.length() ? (path + "/") : "") + name;
   }
   std::string FullPath() const {
@@ -24,7 +25,7 @@ public:
   }
   bool operator<(const File& rhs) const
   {
-    return FullPath().compare(rhs.FullPath());
+    return FullPath().compare(rhs.FullPath()) < 0;
   }
   bool isHeader() const {
     std::string file = FullPath();

@@ -18,7 +18,7 @@ using namespace std;
 //       a: remove all edges where any of the files is in the filter list
 //       b: only remove all edges away from a file in the filter list
 // TODO: also, make sure that all includes are reachable from the compiled cpp files, otherwise we'll get cluster of files that are not relevant
-
+// TODO: clean up beginning of paths if not needed (i.e. no duplicates)
 
 bool checkPathFilter(const string a, const vector<string> &filters) {
   for (auto &f : filters) {
@@ -86,61 +86,116 @@ void generateDot(
 }
 #endif
 
-void generatePlantUml(
-  const string &outputFile,
-  const vector<string> &filters,
-  const map<string, shared_ptr<File>> &nameToFileMap,
-  bool clusters)
-{
-  filebuf fb;
-  fb.open (outputFile + ".puml", ios_base::out);
-  ostream os(&fb);
+class OutputGenerator {
+protected:
+  const string extension;
+  OutputGenerator(const string extension) : extension(extension) {}
+  virtual void header(ostream& os, bool clusters) const {};
+  virtual void footer(ostream& os) const {};
+  virtual void nodeDefinition(ostream& os, shared_ptr<File> file, bool clusters) const {};
+  virtual void edgeDefinition(ostream& os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) const {}
 
-  os << "@startuml" << endl;
-  if (clusters) {
-    os << "\tset namespaceSeparator ::" << endl;
-  }
-  else {
-    os << "\tset namespaceSeparator none" << endl;
-  }
-  os << "\thide members" << endl;
+};
 
-  for (auto &a : nameToFileMap) {
-    bool matchFilter = checkPathFilter(a.second->FullPath(), filters);
-    if (!matchFilter) {
-      for (auto &b : a.second->includes) {
-        string file = b->FullPath();
-        if (!checkPathFilter(file, filters)) {
-          if (clusters) {
-            file = ReplaceString(file, "/", "::");
+class PlantUmlGenerator : public OutputGenerator {
+public:
+  PlantUmlGenerator() : OutputGenerator(".puml") {
+
+  }
+
+  void generate(
+    const string &outputFile,
+    const vector<string> &filters,
+    const map<string, shared_ptr<File>> &nameToFileMap,
+    bool clusters)
+  {
+    set<shared_ptr<File>> nodes;
+    for (auto &includer : nameToFileMap) {
+      auto includerPath = includer.second->FullPath();
+      if (!checkPathFilter(includerPath, filters)) {
+        // TODO: should we include includers without includees?
+        if (!includer.second->includes.empty()) {
+          nodes.insert(includer.second);
+        }
+
+        for (auto &includee : includer.second->includes) {
+          if (!checkPathFilter(includee->FullPath(), filters)) {
+            nodes.insert(includee);
           }
-          os << "\tclass \"" << file << "\" " << (b->isHeader() ? "<< (h,lightgreen) >>" : "") << endl;
         }
       }
     }
-  }
 
-  for (auto& includer: nameToFileMap) {
-    auto includerPath = includer.second->FullPath();
-    if (!checkPathFilter(includerPath, filters)) {
-      string from = ReplaceString(includerPath, "/", "::");
-      for (auto &includee: includer.second->includes) {
-        auto includeePath = includee->FullPath();
-        if (!checkPathFilter(includeePath, filters)) {
-          string to = includeePath;
-          if (clusters) {
-            to = ReplaceString(to, "/", "::");
+
+    set<pair<shared_ptr<File>, shared_ptr<File>>> edges;
+
+    for (auto& includer: nameToFileMap) {
+      auto includerPath = includer.second->FullPath();
+      if (!checkPathFilter(includerPath, filters)) {
+        for (auto &includee: includer.second->includes) {
+          auto includeePath = includee->FullPath();
+          if (!checkPathFilter(includeePath, filters)) {
+            edges.insert(make_pair(includer.second, includee));
           }
-          os << "\t" << "\"" << to << "\"" << " <-- " << "\"" << from << "\"" << endl;
         }
       }
     }
+
+    filebuf fb;
+    fb.open (outputFile + extension, ios_base::out);
+    ostream os(&fb);
+
+    header(os, clusters);
+
+    for (auto &node : nodes) {
+      nodeDefinition(os, node, clusters);
+    }
+    for (auto &edge: edges) {
+      edgeDefinition(os, edge.first, edge.second, clusters);
+    }
+
+    footer(os);
+
+    fb.close();
   }
 
-  os << "@enduml" << endl;
+  void edgeDefinition(ostream& os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) const override {
+    string to = dst->FullPath();
+    string from = src->FullPath();
 
-  fb.close();
-}
+    if (clusters) {
+      to = ReplaceString(to, "/", "::");
+      from = ReplaceString(from, "/", "::");
+    }
+
+    os << "\t" << "\"" << to << "\"" << " <-- " << "\"" << from << "\"" << endl;
+  }
+
+  void nodeDefinition(ostream& os, shared_ptr<File> file, bool clusters) const override {
+    string filePath = file->FullPath();
+    if (clusters) {
+      filePath = ReplaceString(filePath, "/", "::");
+    }
+    os << "\tclass \"" << filePath << "\" " << (file->isHeader() ? "<< (h,lightgreen) >>" : "") << endl;
+  }
+
+  void footer(ostream& os) const override {
+    os << "@enduml" << endl;
+  }
+  void header(ostream& os, bool clusters) const override {
+
+    os << "@startuml" << endl;
+    if (clusters) {
+      os << "\tset namespaceSeparator ::" << endl;
+    }
+    else {
+      os << "\tset namespaceSeparator none" << endl;
+    }
+    os << "\thide members" << endl;
+  }
+};
+
+
 
 int gidd() {
   using namespace std;
@@ -228,8 +283,9 @@ int gidd() {
 
   // generateDot(outputFile, filters, fileMap, fromFileToPath, paths, true);
   // generateDot(outputFile + "_no_clusters", filters, fileMap, fromFileToPath, paths, false);
-  generatePlantUml(outputFile, filters, fileMap, true);
-  generatePlantUml(outputFile + "_no_clusters", filters, fileMap, false);
+  PlantUmlGenerator pumler;
+  pumler.generate(outputFile, filters, fileMap, true);
+  pumler.generate(outputFile + "_no_clusters", filters, fileMap, false);
 
   return 0;
 }
