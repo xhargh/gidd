@@ -26,13 +26,20 @@ public:
   {
     return FullPath().compare(rhs.FullPath());
   }
+  bool isHeader() const {
+    std::string file = FullPath();
+    size_t lastdot = file.find_last_of(".");
+    return lastdot == std::string::npos || file.find("h", lastdot) != std::string::npos ||
+           file.find("H", lastdot) != std::string::npos;
+  }
 };
 
 void generatePlantUml(
   const std::string &outputFile,
   const std::vector<std::string> &filters,
   const std::map<std::string, std::shared_ptr<File>> &nameToFileMap,
-  std::map<std::string, std::set<std::string>> &paths,
   bool clusters = true);
+
+int gidd();
 
 #endif // GIDD_HPP

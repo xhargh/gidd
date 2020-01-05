@@ -14,7 +14,10 @@
 using namespace std;
 
 
-
+// TODO: add two kinds of filtering:
+//       a: remove all edges where any of the files is in the filter list
+//       b: only remove all edges away from a file in the filter list
+// TODO: also, make sure that all includes are reachable from the compiled cpp files, otherwise we'll get cluster of files that are not relevant
 
 
 bool checkPathFilter(const string a, const vector<string> &filters) {
@@ -26,26 +29,6 @@ bool checkPathFilter(const string a, const vector<string> &filters) {
   return false;
 }
 
-bool checkPairs(
-  const shared_ptr<File>firstFile,
-  const shared_ptr<File>secondFile,
-  const vector<string> &filters) {
-
-  auto firstFileFullPath = firstFile->FullPath();
-  auto secondFileFullPath = secondFile->FullPath();
-
-  for (auto &f : filters)
-  {
-    if (
-      (firstFileFullPath.substr(0, f.size()) == f)
-      ||
-      (secondFileFullPath.substr(0, f.size()) == f)
-      ) {
-      return true;
-    }
-  }
-  return false;
-}
 
 
 #if 0
@@ -107,7 +90,6 @@ void generatePlantUml(
   const string &outputFile,
   const vector<string> &filters,
   const map<string, shared_ptr<File>> &nameToFileMap,
-  map<string, set<string>> &paths,
   bool clusters)
 {
   filebuf fb;
@@ -125,30 +107,14 @@ void generatePlantUml(
 
   for (auto &a : nameToFileMap) {
     bool matchFilter = checkPathFilter(a.second->FullPath(), filters);
-
     if (!matchFilter) {
-
       for (auto &b : a.second->includes) {
         string file = b->FullPath();
-
-        // TODO: add two kinds of filtering:
-        //       a: remove all edges where any of the files is in the filter list
-        //       b: only remove all edges away from a file in the filter list
-        // TODO: also, make sure that all includes are reachable from the compiled cpp files, otherwise we'll get cluster of files that are not relevant
         if (!checkPathFilter(file, filters)) {
-
-          bool isHeader = false;
-          size_t lastdot = file.find_last_of(".");
-          if (lastdot == string::npos || file.find("h", lastdot) != string::npos ||
-              file.find("H", lastdot) != string::npos) {
-            isHeader = true;
-          }
-
           if (clusters) {
             file = ReplaceString(file, "/", "::");
           }
-
-          os << "\tclass \"" << file << "\" " << (isHeader ? "<< (h,lightgreen) >>" : "") << endl;
+          os << "\tclass \"" << file << "\" " << (b->isHeader() ? "<< (h,lightgreen) >>" : "") << endl;
         }
       }
     }
@@ -158,7 +124,6 @@ void generatePlantUml(
     auto includerPath = includer.second->FullPath();
     if (!checkPathFilter(includerPath, filters)) {
       string from = ReplaceString(includerPath, "/", "::");
-
       for (auto &includee: includer.second->includes) {
         auto includeePath = includee->FullPath();
         if (!checkPathFilter(includeePath, filters)) {
@@ -175,4 +140,96 @@ void generatePlantUml(
   os << "@enduml" << endl;
 
   fb.close();
+}
+
+int gidd() {
+  using namespace std;
+
+  string line;
+  vector<string> lines;
+
+  const string inputFileName = "input.txt";
+  const string filterFileName = "filter.txt";
+  const string outputFile = "output"; // extension is added later
+
+  // Read input
+  ifstream infile(inputFileName);
+  while (getline(infile, line))
+  {
+    auto firstchar = line.at(0);
+    if (firstchar == '.'
+        || (firstchar == '['
+            && (
+              line.find("Building CXX object") != string::npos || line.find("Building C object") != string::npos))) {
+      lines.push_back(line);
+    }
+  }
+
+  // Read filters
+  vector<string> filters;
+  ifstream filterFile(filterFileName);
+  while (getline(filterFile, line))
+  {
+    filters.push_back(line);
+  }
+
+  vector<string> s;
+
+  map<string, shared_ptr<File>> fileMap; // name -> File struct
+
+  for (auto& l : lines)
+  {
+    size_t level = l.find(" ");
+    string file;
+    string path = "";
+
+    if (l.at(0) == '[') {
+      level = 0;
+
+      file = l.substr(l.find_last_of("/")+1); // remove everything up to last /
+      // TODO: add support for other extensions than .o
+      file = file.substr(0, file.length()-2); // remove ".o"
+    }
+    else {
+      string fullpath = l.substr(level + 1); // full path
+
+      file = l.substr(l.find_last_of("/")+1); // only filename
+      path = removeDots(fullpath.substr(0, fullpath.find_last_of("/"))); // only path
+    }
+    string key = File::FullPath(path, file);
+
+    // Only insert new file if not already created
+    if (fileMap.count(key) == 0) {
+      fileMap[key] = make_shared<File>(file, path);
+    }
+
+    if (s.size() <= level)
+    {
+      s.push_back(key);
+    }
+    else {
+      s[level] = key;
+    }
+
+    if (level > 0)
+    {
+      string includer = s[level-1];
+      fileMap[includer]->includes.insert(fileMap[key]);
+    }
+  }
+
+  for (auto& x : fileMap) {
+    cout << x.second->name << " -> " << endl;
+    for (auto& y: x.second->includes) {
+      cout << "\t" << y->name << endl;
+    }
+    cout << endl;
+  }
+
+  // generateDot(outputFile, filters, fileMap, fromFileToPath, paths, true);
+  // generateDot(outputFile + "_no_clusters", filters, fileMap, fromFileToPath, paths, false);
+  generatePlantUml(outputFile, filters, fileMap, true);
+  generatePlantUml(outputFile + "_no_clusters", filters, fileMap, false);
+
+  return 0;
 }
