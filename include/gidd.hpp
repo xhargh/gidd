@@ -35,11 +35,15 @@ public:
   }
 };
 
-void generatePlantUml(
-  const std::string &outputFile,
-  const std::vector<std::string> &filters,
-  const std::map<std::string, std::shared_ptr<File>> &nameToFileMap,
-  bool clusters = true);
+using node_t = std::shared_ptr<File>;
+using edge_t = std::pair<node_t, node_t>;
+using nodes_t = std::set<node_t>;
+using edges_t = std::set<edge_t>;
+
+struct graph_t {
+  nodes_t nodes;
+  edges_t edges;
+};
 
 int gidd();
 

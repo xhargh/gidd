@@ -92,8 +92,105 @@ protected:
   OutputGenerator(const string extension) : extension(extension) {}
   virtual void header(ostream& os, bool clusters) const {};
   virtual void footer(ostream& os) const {};
+  virtual void nodeDefinitionBegin(ostream& os) const {};
   virtual void nodeDefinition(ostream& os, shared_ptr<File> file, bool clusters) const {};
-  virtual void edgeDefinition(ostream& os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) const {}
+  virtual void nodeDefinitionEnd(ostream& os) const {};
+  virtual void edgeDefinitionBegin(ostream& os) const {};
+  virtual void edgeDefinition(ostream& os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) const {};
+  virtual void edgeDefinitionEnd(ostream& os) const {};
+
+  graph_t generateNodesAndEdges(const set<shared_ptr<File>> &files, const vector<string> &filters) const {
+    nodes_t nodes;
+    edges_t edges;
+
+    for (auto &includer : files) {
+      auto includerPath = includer->FullPath();
+      if (!checkPathFilter(includerPath, filters)) {
+
+        if (!includer->includes.empty()) {
+          nodes.insert(includer);
+        }
+
+        for (auto &includee : includer->includes) {
+          if (!checkPathFilter(includee->FullPath(), filters)) {
+            nodes.insert(includee);
+            edges.insert(make_pair(includer, includee));
+          }
+        }
+
+      }
+    }
+    return {nodes, edges};
+  }
+public:
+  void generate(
+    const string &outputFile,
+    const vector<string> &filters,
+    const set<shared_ptr<File>> &files,
+    bool clusters)
+  {
+
+    graph_t graph = generateNodesAndEdges(files, filters);
+
+
+    filebuf fb;
+    fb.open (outputFile + extension, ios_base::out);
+    ostream os(&fb);
+
+    header(os, clusters);
+
+    nodeDefinitionBegin(os);
+    for (auto &node : graph.nodes) {
+      nodeDefinition(os, node, clusters);
+    }
+    nodeDefinitionEnd(os);
+
+    edgeDefinitionBegin(os);
+    for (auto &edge: graph.edges) {
+      edgeDefinition(os, edge.first, edge.second, clusters);
+    }
+    edgeDefinitionEnd(os);
+
+    footer(os);
+
+    fb.close();
+  }
+
+};
+
+class DotGenerator : public OutputGenerator {
+public:
+  DotGenerator() : OutputGenerator(".dot") {}
+protected:
+  void header(ostream &os, bool clusters) const override {
+    os << "digraph G {" << endl;
+  }
+
+  void footer(ostream &os) const override {
+    os << "}" << endl;
+  }
+
+  void nodeDefinition(ostream &os, shared_ptr<File> file, bool clusters) const override {
+    string headerModifier = file->isHeader() ? "" : " [shape=box, style=filled, color=lightblue]";
+    os << "\t" << "\"" << file->name << "\"" << headerModifier << ";" << endl;
+  }
+
+  void edgeDefinition(ostream &os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) const override {
+    string linkModifier=" [overlap=scale]";
+    os << "\t" << "\"" << src->name << "\" -> \"" << dst->name << "\"" << linkModifier << ";" << endl;
+  }
+
+  void nodeDefinitionBegin(ostream &os) const override {
+  }
+
+  void nodeDefinitionEnd(ostream &os) const override {
+  }
+
+  void edgeDefinitionBegin(ostream &os) const override {
+  }
+
+  void edgeDefinitionEnd(ostream &os) const override {
+  }
 
 };
 
@@ -103,60 +200,16 @@ public:
 
   }
 
-  void generate(
-    const string &outputFile,
-    const vector<string> &filters,
-    const map<string, shared_ptr<File>> &nameToFileMap,
-    bool clusters)
-  {
-    set<shared_ptr<File>> nodes;
-    for (auto &includer : nameToFileMap) {
-      auto includerPath = includer.second->FullPath();
-      if (!checkPathFilter(includerPath, filters)) {
-        // TODO: should we include includers without includees?
-        if (!includer.second->includes.empty()) {
-          nodes.insert(includer.second);
-        }
+  void header(ostream& os, bool clusters) const override {
 
-        for (auto &includee : includer.second->includes) {
-          if (!checkPathFilter(includee->FullPath(), filters)) {
-            nodes.insert(includee);
-          }
-        }
-      }
+    os << "@startuml" << endl;
+    if (clusters) {
+      os << "\tset namespaceSeparator ::" << endl;
     }
-
-
-    set<pair<shared_ptr<File>, shared_ptr<File>>> edges;
-
-    for (auto& includer: nameToFileMap) {
-      auto includerPath = includer.second->FullPath();
-      if (!checkPathFilter(includerPath, filters)) {
-        for (auto &includee: includer.second->includes) {
-          auto includeePath = includee->FullPath();
-          if (!checkPathFilter(includeePath, filters)) {
-            edges.insert(make_pair(includer.second, includee));
-          }
-        }
-      }
+    else {
+      os << "\tset namespaceSeparator none" << endl;
     }
-
-    filebuf fb;
-    fb.open (outputFile + extension, ios_base::out);
-    ostream os(&fb);
-
-    header(os, clusters);
-
-    for (auto &node : nodes) {
-      nodeDefinition(os, node, clusters);
-    }
-    for (auto &edge: edges) {
-      edgeDefinition(os, edge.first, edge.second, clusters);
-    }
-
-    footer(os);
-
-    fb.close();
+    os << "\thide members" << endl;
   }
 
   void edgeDefinition(ostream& os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) const override {
@@ -182,17 +235,7 @@ public:
   void footer(ostream& os) const override {
     os << "@enduml" << endl;
   }
-  void header(ostream& os, bool clusters) const override {
 
-    os << "@startuml" << endl;
-    if (clusters) {
-      os << "\tset namespaceSeparator ::" << endl;
-    }
-    else {
-      os << "\tset namespaceSeparator none" << endl;
-    }
-    os << "\thide members" << endl;
-  }
 };
 
 
@@ -273,19 +316,20 @@ int gidd() {
     }
   }
 
-  for (auto& x : fileMap) {
-    cout << x.second->name << " -> " << endl;
-    for (auto& y: x.second->includes) {
-      cout << "\t" << y->name << endl;
-    }
-    cout << endl;
+
+  set<shared_ptr<File>> files;
+  for (auto& f : fileMap) {
+    files.insert(f.second);
   }
 
   // generateDot(outputFile, filters, fileMap, fromFileToPath, paths, true);
   // generateDot(outputFile + "_no_clusters", filters, fileMap, fromFileToPath, paths, false);
+  DotGenerator dotter;
+  dotter.generate(outputFile, filters, files, true);
+  dotter.generate(outputFile + "_no_clusters", filters, files, false);
   PlantUmlGenerator pumler;
-  pumler.generate(outputFile, filters, fileMap, true);
-  pumler.generate(outputFile + "_no_clusters", filters, fileMap, false);
+  pumler.generate(outputFile, filters, files, true);
+  pumler.generate(outputFile + "_no_clusters", filters, files, false);
 
   return 0;
 }
