@@ -29,75 +29,18 @@ bool checkPathFilter(const string a, const vector<string> &filters) {
   return false;
 }
 
-
-
-#if 0
-void generateDot(
-  const string &outputFile,
-  const vector<string> &filters,
-  const map<string, shared_ptr<File>> &pairs,
-  map<string, string> &fromFileToPath,
-  map<string, set<string>> &paths,
-  bool clusters = true)
-{
-  filebuf fb;
-  fb.open (outputFile + ".dot", ios_base::out);
-  ostream os(&fb);
-
-  os << "digraph G {" << endl;
-
-  if (clusters) {
-    int clusterNum = 0;
-
-    for (auto &a : paths) {
-      bool matchFilter = checkPathFilter(a.first, filters);
-
-      if (!matchFilter) {
-        os << "subgraph cluster_" << clusterNum << "{" << endl;
-        os << "label = \"" << a.first << "\";" << endl;
-        for (auto &b : a.second) {
-          os << "\"" << b << "\";" << endl;
-        }
-        os << "}" << endl;
-        clusterNum++;
-      }
-    }
-  }
-
-  for (auto& p : pairs)
-  {
-    bool matchFilter = checkPairs(p, fromFileToPath, filters);
-
-    if (!matchFilter) {
-      string headerModifier = " [shape=box, style=filled, color=lightblue]";
-      string linkModifier=" [overlap=scale]";
-
-      if (fromFileToPath[p.first].compare("") == 0)
-      {
-        os << "\t" << "\"" << p.first << "\"" << headerModifier << ";" << endl;
-      }
-      os << "\t" << "\"" << p.first << "\"" << " -> "  << "\"" << p.second << "\"" << linkModifier << ";" << endl;
-    }
-  }
-
-  os << "}" << endl;
-
-  fb.close();
-}
-#endif
-
 class OutputGenerator {
 protected:
   const string extension;
   OutputGenerator(const string extension) : extension(extension) {}
-  virtual void header(ostream& os, bool clusters) const {};
-  virtual void footer(ostream& os) const {};
-  virtual void nodeDefinitionBegin(ostream& os) const {};
-  virtual void nodeDefinition(ostream& os, shared_ptr<File> file, bool clusters) const {};
-  virtual void nodeDefinitionEnd(ostream& os) const {};
-  virtual void edgeDefinitionBegin(ostream& os) const {};
-  virtual void edgeDefinition(ostream& os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) const {};
-  virtual void edgeDefinitionEnd(ostream& os) const {};
+  virtual void header(ostream& os, bool clusters) {};
+  virtual void footer(ostream& os) {};
+  virtual void nodeDefinitionBegin(ostream& os) {};
+  virtual void nodeDefinition(ostream& os, shared_ptr<File> file, bool clusters) {};
+  virtual void nodeDefinitionEnd(ostream& os) {};
+  virtual void edgeDefinitionBegin(ostream& os) {};
+  virtual void edgeDefinition(ostream& os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) {};
+  virtual void edgeDefinitionEnd(ostream& os) {};
 
   graph_t generateNodesAndEdges(const set<shared_ptr<File>> &files, const vector<string> &filters) const {
     nodes_t nodes;
@@ -161,35 +104,58 @@ public:
 class DotGenerator : public OutputGenerator {
 public:
   DotGenerator() : OutputGenerator(".dot") {}
+private:
+  map<string, nodes_t> clusters;
+  bool useClusters = false;
+
 protected:
-  void header(ostream &os, bool clusters) const override {
+  void header(ostream &os, bool clusters) override {
     os << "digraph G {" << endl;
   }
 
-  void footer(ostream &os) const override {
+  void footer(ostream &os) override {
     os << "}" << endl;
   }
 
-  void nodeDefinition(ostream &os, shared_ptr<File> file, bool clusters) const override {
-    string headerModifier = file->isHeader() ? "" : " [shape=box, style=filled, color=lightblue]";
-    os << "\t" << "\"" << file->name << "\"" << headerModifier << ";" << endl;
+  void nodeDefinitionBegin(ostream &os) override {
+    clusters.clear();
   }
 
-  void edgeDefinition(ostream &os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) const override {
+  void nodeDefinition(ostream &os, shared_ptr<File> file, bool clusters) override {
+    this->clusters[file->path].insert(file);
+    useClusters = clusters;
+  }
+
+  void nodeDefinitionEnd(ostream &os) override {
+    int clusterNum = 0;
+    for (auto &cluster : clusters) {
+      if (useClusters) {
+        os << "subgraph cluster_" << clusterNum << "{" << endl;
+        os << "\tlabel = \"" << cluster.first << "\";" << endl;
+      }
+      for (auto &file : cluster.second) {
+        string headerModifier = file->isHeader() ? "" : ", shape=box, style=filled, color=lightblue";
+        os << "\t" << "\"" << file->FullPath() << "\" [ label=\"" << file->name << "\"" << headerModifier << "];" << endl;
+      }
+      if (useClusters) {
+        os << "}" << endl;
+      }
+      clusterNum++;
+
+    }
+  }
+
+
+  void edgeDefinition(ostream &os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) override {
     string linkModifier=" [overlap=scale]";
-    os << "\t" << "\"" << src->name << "\" -> \"" << dst->name << "\"" << linkModifier << ";" << endl;
+    os << "\t" << "\"" << src->FullPath() << "\" -> \"" << dst->FullPath() << "\"" << linkModifier << ";" << endl;
   }
 
-  void nodeDefinitionBegin(ostream &os) const override {
+
+  void edgeDefinitionBegin(ostream &os) override {
   }
 
-  void nodeDefinitionEnd(ostream &os) const override {
-  }
-
-  void edgeDefinitionBegin(ostream &os) const override {
-  }
-
-  void edgeDefinitionEnd(ostream &os) const override {
+  void edgeDefinitionEnd(ostream &os) override {
   }
 
 };
@@ -200,7 +166,7 @@ public:
 
   }
 
-  void header(ostream& os, bool clusters) const override {
+  void header(ostream& os, bool clusters) override {
 
     os << "@startuml" << endl;
     if (clusters) {
@@ -212,7 +178,7 @@ public:
     os << "\thide members" << endl;
   }
 
-  void edgeDefinition(ostream& os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) const override {
+  void edgeDefinition(ostream& os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) override {
     string to = dst->FullPath();
     string from = src->FullPath();
 
@@ -224,7 +190,7 @@ public:
     os << "\t" << "\"" << to << "\"" << " <-- " << "\"" << from << "\"" << endl;
   }
 
-  void nodeDefinition(ostream& os, shared_ptr<File> file, bool clusters) const override {
+  void nodeDefinition(ostream& os, shared_ptr<File> file, bool clusters) override {
     string filePath = file->FullPath();
     if (clusters) {
       filePath = ReplaceString(filePath, "/", "::");
@@ -232,7 +198,7 @@ public:
     os << "\tclass \"" << filePath << "\" " << (file->isHeader() ? "<< (h,lightgreen) >>" : "") << endl;
   }
 
-  void footer(ostream& os) const override {
+  void footer(ostream& os) override {
     os << "@enduml" << endl;
   }
 
@@ -322,8 +288,6 @@ int gidd() {
     files.insert(f.second);
   }
 
-  // generateDot(outputFile, filters, fileMap, fromFileToPath, paths, true);
-  // generateDot(outputFile + "_no_clusters", filters, fileMap, fromFileToPath, paths, false);
   DotGenerator dotter;
   dotter.generate(outputFile, filters, files, true);
   dotter.generate(outputFile + "_no_clusters", filters, files, false);
