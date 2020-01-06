@@ -58,8 +58,10 @@ void GmlGenerator::header(std::ostream &os, bool clusters) {
   // os << "\t" << "id 42" << endl;
   os << "\t" << "label \"This is a gidd graph\"" << endl;
 
+  clusterIds.empty();
   nodeIds.empty();
   currentNodeId = 0;
+  currentClusterId = 0;
 }
 
 void GmlGenerator::footer(std::ostream &os) {
@@ -74,13 +76,90 @@ void GmlGenerator::nodeDefinition(std::ostream &os, std::shared_ptr<File> file, 
     	thisIsASampleAttribute 42
     ]
    */
+  /*
+	node
+	[
+		id	0
+		label	"gidd_utils.hpp"
+		graphics
+		[
+			x	857.6746031746031
+			y	226.7401153701776
+			w	97.396484375
+			h	30.0
+			type	"rectangle"
+			raisedBorder	0
+			fill	"#FFCC00"
+			outline	"#000000"
+		]
+		LabelGraphics
+		[
+			text	"gidd_utils.hpp"
+			fontSize	12
+			fontName	"Dialog"
+			model	"null"
+		]
+	]
+   */
+  /* groups:
+  	node
+	[
+		id	16
+		label	"KalleAnka"
+		graphics
+		[
+			fill	"#F5F5F5"
+		]
+		LabelGraphics
+		[
+			anchor	"t"
+		]
+		isGroup	1
+	]
+
+   then in a node, add "gid xx" where xx is the id of the group node
+   */
   currentNodeId++;
   nodeIds[file] = currentNodeId;
 
-  os << "\tnode [" << endl;
-  os << "\t\tid " << currentNodeId << endl;
-  os << "\t\tlabel \"" << file->name<< "\"" << endl;
-  os << "\t]" << endl;
+  if (clusters) {
+    if (clusterIds.find(file->path) == clusterIds.end()) {
+      currentClusterId++;
+      clusterIds[file->path] = currentClusterId;
+    }
+  }
+
+
+}
+
+void GmlGenerator::nodeDefinitionEnd(std::ostream &os) {
+  for (auto& node : nodeIds) {
+    os << "\tnode [" << endl;
+    os << "\t\tid " << node.second << endl;
+    os << "\t\tlabel \"" << node.first->name<< "\"" << endl;
+    os << "\t\tgraphics [" << endl;
+    os << "\t\t\tfill \"" << (node.first->isHeader()?"#ffcc00":"#00ccff") << "\"" << endl;
+    os << "\t\t]" << endl; // graphics
+    if (currentClusterId) {
+      os << "\t\tgid " << clusterIds[node.first->path] + currentNodeId << endl;
+    }
+    os << "\t]" << endl;
+  }
+
+  for (auto& group : clusterIds) {
+    os << "\tnode [" << endl;
+    os << "\t\tid " << currentNodeId + group.second << endl;
+    os << "\t\tlabel \"" << group.first << "\"" << endl;
+    os << "\t\tgraphics [" << endl;
+    os << "\t\t\tfill \"" << "#cccccc" << "\"" << endl;
+    os << "\t\t]" << endl; // graphics
+    os << "\t\tLabelGraphics" << endl;
+    os << "\t\t[" << endl;
+    os << "\t\t\tanchor \"t\"" << endl;
+    os << "\t\t]" << endl; // LabelGraphics
+    os << "\t\tisGroup 1" << endl;
+    os << "\t]" << endl;
+  }
 }
 
 void GmlGenerator::edgeDefinition(std::ostream &os, std::shared_ptr<File> src, std::shared_ptr<File> dst, bool clusters) {

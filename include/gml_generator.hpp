@@ -12,7 +12,9 @@
 class GmlGenerator : public OutputGenerator {
 private:
   std::map<node_t, int> nodeIds;
+  std::map<std::string, int> clusterIds;
   int currentNodeId;
+  int currentClusterId;
 public:
   GmlGenerator();
 protected:
@@ -21,6 +23,8 @@ protected:
   void footer(std::ostream &os) override;
 
   void nodeDefinition(std::ostream &os, std::shared_ptr<File> file, bool clusters) override;
+
+  void nodeDefinitionEnd(std::ostream &os) override;
 
   void edgeDefinition(std::ostream &os, std::shared_ptr<File> src, std::shared_ptr<File> dst, bool clusters) override;
 

@@ -114,6 +114,7 @@ int gidd() {
   pumler.generate(outputFile + "_no_clusters", filters, files, false);
   GmlGenerator gmler;
   gmler.generate(outputFile, filters, files, true);
+  gmler.generate(outputFile + "_no_clusters", filters, files, false);
 
   return 0;
 }
