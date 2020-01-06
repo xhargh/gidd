@@ -7,9 +7,10 @@
 #include <vector>
 #include <set>
 #include <map>
-#include <sstream>
 #include "gidd.hpp"
-#include "../include/gidd_utils.hpp"
+#include "dot_generator.hpp"
+#include "plantuml_generator.hpp"
+#include "gml_generator.hpp"
 
 using namespace std;
 
@@ -20,189 +21,6 @@ using namespace std;
 // TODO: also, make sure that all includes are reachable from the compiled cpp files, otherwise we'll get cluster of files that are not relevant
 // TODO: clean up beginning of paths if not needed (i.e. no duplicates)
 
-bool checkPathFilter(const string a, const vector<string> &filters) {
-  for (auto &f : filters) {
-    if (a.substr(0, f.size()) == f) {
-      return true;
-    }
-  }
-  return false;
-}
-
-class OutputGenerator {
-protected:
-  const string extension;
-  OutputGenerator(const string extension) : extension(extension) {}
-  virtual void header(ostream& os, bool clusters) {};
-  virtual void footer(ostream& os) {};
-  virtual void nodeDefinitionBegin(ostream& os) {};
-  virtual void nodeDefinition(ostream& os, shared_ptr<File> file, bool clusters) {};
-  virtual void nodeDefinitionEnd(ostream& os) {};
-  virtual void edgeDefinitionBegin(ostream& os) {};
-  virtual void edgeDefinition(ostream& os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) {};
-  virtual void edgeDefinitionEnd(ostream& os) {};
-
-  graph_t generateNodesAndEdges(const set<shared_ptr<File>> &files, const vector<string> &filters) const {
-    nodes_t nodes;
-    edges_t edges;
-
-    for (auto &includer : files) {
-      auto includerPath = includer->FullPath();
-      if (!checkPathFilter(includerPath, filters)) {
-
-        if (!includer->includes.empty()) {
-          nodes.insert(includer);
-        }
-
-        for (auto &includee : includer->includes) {
-          if (!checkPathFilter(includee->FullPath(), filters)) {
-            nodes.insert(includee);
-            edges.insert(make_pair(includer, includee));
-          }
-        }
-
-      }
-    }
-    return {nodes, edges};
-  }
-public:
-  void generate(
-    const string &outputFile,
-    const vector<string> &filters,
-    const set<shared_ptr<File>> &files,
-    bool clusters)
-  {
-
-    graph_t graph = generateNodesAndEdges(files, filters);
-
-
-    filebuf fb;
-    fb.open (outputFile + extension, ios_base::out);
-    ostream os(&fb);
-
-    header(os, clusters);
-
-    nodeDefinitionBegin(os);
-    for (auto &node : graph.nodes) {
-      nodeDefinition(os, node, clusters);
-    }
-    nodeDefinitionEnd(os);
-
-    edgeDefinitionBegin(os);
-    for (auto &edge: graph.edges) {
-      edgeDefinition(os, edge.first, edge.second, clusters);
-    }
-    edgeDefinitionEnd(os);
-
-    footer(os);
-
-    fb.close();
-  }
-
-};
-
-class DotGenerator : public OutputGenerator {
-public:
-  DotGenerator() : OutputGenerator(".dot") {}
-private:
-  map<string, nodes_t> clusters;
-  bool useClusters = false;
-
-protected:
-  void header(ostream &os, bool clusters) override {
-    os << "digraph G {" << endl;
-  }
-
-  void footer(ostream &os) override {
-    os << "}" << endl;
-  }
-
-  void nodeDefinitionBegin(ostream &os) override {
-    clusters.clear();
-  }
-
-  void nodeDefinition(ostream &os, shared_ptr<File> file, bool clusters) override {
-    this->clusters[file->path].insert(file);
-    useClusters = clusters;
-  }
-
-  void nodeDefinitionEnd(ostream &os) override {
-    int clusterNum = 0;
-    for (auto &cluster : clusters) {
-      if (useClusters) {
-        os << "subgraph cluster_" << clusterNum << "{" << endl;
-        os << "\tlabel = \"" << cluster.first << "\";" << endl;
-      }
-      for (auto &file : cluster.second) {
-        string headerModifier = file->isHeader() ? "" : ", shape=box, style=filled, color=lightblue";
-        os << "\t" << "\"" << file->FullPath() << "\" [ label=\"" << file->name << "\"" << headerModifier << "];" << endl;
-      }
-      if (useClusters) {
-        os << "}" << endl;
-      }
-      clusterNum++;
-
-    }
-  }
-
-
-  void edgeDefinition(ostream &os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) override {
-    string linkModifier=" [overlap=scale]";
-    os << "\t" << "\"" << src->FullPath() << "\" -> \"" << dst->FullPath() << "\"" << linkModifier << ";" << endl;
-  }
-
-
-  void edgeDefinitionBegin(ostream &os) override {
-  }
-
-  void edgeDefinitionEnd(ostream &os) override {
-  }
-
-};
-
-class PlantUmlGenerator : public OutputGenerator {
-public:
-  PlantUmlGenerator() : OutputGenerator(".puml") {
-
-  }
-
-  void header(ostream& os, bool clusters) override {
-
-    os << "@startuml" << endl;
-    if (clusters) {
-      os << "\tset namespaceSeparator ::" << endl;
-    }
-    else {
-      os << "\tset namespaceSeparator none" << endl;
-    }
-    os << "\thide members" << endl;
-  }
-
-  void edgeDefinition(ostream& os, shared_ptr<File> src, shared_ptr<File> dst, bool clusters) override {
-    string to = dst->FullPath();
-    string from = src->FullPath();
-
-    if (clusters) {
-      to = ReplaceString(to, "/", "::");
-      from = ReplaceString(from, "/", "::");
-    }
-
-    os << "\t" << "\"" << to << "\"" << " <-- " << "\"" << from << "\"" << endl;
-  }
-
-  void nodeDefinition(ostream& os, shared_ptr<File> file, bool clusters) override {
-    string filePath = file->FullPath();
-    if (clusters) {
-      filePath = ReplaceString(filePath, "/", "::");
-    }
-    os << "\tclass \"" << filePath << "\" " << (file->isHeader() ? "<< (h,lightgreen) >>" : "") << endl;
-  }
-
-  void footer(ostream& os) override {
-    os << "@enduml" << endl;
-  }
-
-};
 
 
 
@@ -294,6 +112,8 @@ int gidd() {
   PlantUmlGenerator pumler;
   pumler.generate(outputFile, filters, files, true);
   pumler.generate(outputFile + "_no_clusters", filters, files, false);
+  GmlGenerator gmler;
+  gmler.generate(outputFile, filters, files, true);
 
   return 0;
 }
