@@ -20,11 +20,11 @@ public:
 protected:
   void header(std::ostream &os, bool clusters) override;
 
-  void footer(std::ostream &os) override;
+  void footer(std::ostream &os, bool clusters) override;
 
   void nodeDefinition(std::ostream &os, std::shared_ptr<File> file, bool clusters) override;
 
-  void nodeDefinitionEnd(std::ostream &os) override;
+  void nodeDefinitionEnd(std::ostream &os, bool clusters) override;
 
   void edgeDefinition(std::ostream &os, std::shared_ptr<File> src, std::shared_ptr<File> dst, bool clusters) override;
 

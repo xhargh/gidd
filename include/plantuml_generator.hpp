@@ -17,7 +17,7 @@ public:
 
   void nodeDefinition(std::ostream& os, std::shared_ptr<File> file, bool clusters) override;
 
-  void footer(std::ostream& os) override;
+  void footer(std::ostream& os, bool clusters) override;
 };
 
 

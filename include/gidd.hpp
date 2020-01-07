@@ -12,6 +12,8 @@
 #include "gidd_utils.hpp"
 #include "file.hpp"
 
+#include "gidd.hpp" // just to test recursive includes
+
 int gidd();
 
 #endif // GIDD_HPP

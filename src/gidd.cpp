@@ -67,8 +67,11 @@ int gidd() {
 
     if (l.at(0) == '[') {
       level = 0;
-
-      file = l.substr(l.find_last_of("/")+1); // remove everything up to last /
+      auto pathStart = l.find("object ") + 7;
+      auto pathEnd = l.find_last_of("/");
+      path = removeDots(l.substr(pathStart, pathEnd-pathStart));
+      file = l.substr(pathEnd + 1); // remove everything up to last /
+      cout << path << endl;
       // TODO: add support for other extensions than .o
       file = file.substr(0, file.length()-2); // remove ".o"
     }

@@ -43,6 +43,6 @@ void PlantUmlGenerator::nodeDefinition(ostream& os, shared_ptr<File> file, bool 
   os << "\tclass \"" << filePath << "\" " << (file->isHeader() ? "<< (h,lightgreen) >>" : "") << endl;
 }
 
-void PlantUmlGenerator::footer(ostream& os) {
+void PlantUmlGenerator::footer(ostream& os, bool clusters) {
   os << "@enduml" << endl;
 }

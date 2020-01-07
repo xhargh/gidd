@@ -64,7 +64,7 @@ void GmlGenerator::header(std::ostream &os, bool clusters) {
   currentClusterId = 0;
 }
 
-void GmlGenerator::footer(std::ostream &os) {
+void GmlGenerator::footer(std::ostream &os, bool clusters) {
   os << "]" << endl;
 }
 
@@ -132,7 +132,7 @@ void GmlGenerator::nodeDefinition(std::ostream &os, std::shared_ptr<File> file, 
 
 }
 
-void GmlGenerator::nodeDefinitionEnd(std::ostream &os) {
+void GmlGenerator::nodeDefinitionEnd(std::ostream &os, bool clusters) {
   for (auto& node : nodeIds) {
     os << "\tnode [" << endl;
     os << "\t\tid " << node.second << endl;
@@ -140,25 +140,27 @@ void GmlGenerator::nodeDefinitionEnd(std::ostream &os) {
     os << "\t\tgraphics [" << endl;
     os << "\t\t\tfill \"" << (node.first->isHeader()?"#ffcc00":"#00ccff") << "\"" << endl;
     os << "\t\t]" << endl; // graphics
-    if (currentClusterId) {
+    if (clusters) {
       os << "\t\tgid " << clusterIds[node.first->path] + currentNodeId << endl;
     }
     os << "\t]" << endl;
   }
 
-  for (auto& group : clusterIds) {
-    os << "\tnode [" << endl;
-    os << "\t\tid " << currentNodeId + group.second << endl;
-    os << "\t\tlabel \"" << group.first << "\"" << endl;
-    os << "\t\tgraphics [" << endl;
-    os << "\t\t\tfill \"" << "#cccccc" << "\"" << endl;
-    os << "\t\t]" << endl; // graphics
-    os << "\t\tLabelGraphics" << endl;
-    os << "\t\t[" << endl;
-    os << "\t\t\tanchor \"t\"" << endl;
-    os << "\t\t]" << endl; // LabelGraphics
-    os << "\t\tisGroup 1" << endl;
-    os << "\t]" << endl;
+  if (clusters) {
+    for (auto& group : clusterIds) {
+      os << "\tnode [" << endl;
+      os << "\t\tid " << currentNodeId + group.second << endl;
+      os << "\t\tlabel \"" << group.first << "\"" << endl;
+      os << "\t\tgraphics [" << endl;
+      os << "\t\t\tfill \"" << "#cccccc" << "\"" << endl;
+      os << "\t\t]" << endl; // graphics
+      os << "\t\tLabelGraphics" << endl;
+      os << "\t\t[" << endl;
+      os << "\t\t\tanchor \"t\"" << endl;
+      os << "\t\t]" << endl; // LabelGraphics
+      os << "\t\tisGroup 1" << endl;
+      os << "\t]" << endl;
+    }
   }
 }
 

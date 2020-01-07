@@ -58,19 +58,19 @@ void OutputGenerator::generate(
 
   header(os, clusters);
 
-  nodeDefinitionBegin(os);
+  nodeDefinitionBegin(os, clusters);
   for (auto &node : graph.nodes) {
     nodeDefinition(os, node, clusters);
   }
-  nodeDefinitionEnd(os);
+  nodeDefinitionEnd(os, clusters);
 
-  edgeDefinitionBegin(os);
+  edgeDefinitionBegin(os, clusters);
   for (auto &edge: graph.edges) {
     edgeDefinition(os, edge.first, edge.second, clusters);
   }
-  edgeDefinitionEnd(os);
+  edgeDefinitionEnd(os, clusters);
 
-  footer(os);
+  footer(os, clusters);
 
   fb.close();
 }

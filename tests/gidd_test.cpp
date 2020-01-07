@@ -33,4 +33,8 @@ TEST_CASE( "Remove . and .. from paths", "[utils]"){
   REQUIRE( removeDots("/./A/./B/./C") == "/A/B/C" );
   REQUIRE( removeDots("/apa") == "/apa" );
   REQUIRE( removeDots("") == "" );
+  REQUIRE( removeDots("src/foo") == "src/foo" );
+  REQUIRE( removeDots("..") == ".." );
+  REQUIRE( removeDots("../..") == "../.." );
+  REQUIRE( removeDots("../../foo") == "../../foo" );
 }

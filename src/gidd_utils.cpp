@@ -24,20 +24,31 @@ vector<string> split(const string &s, char delimiter) {
 
 
 string removeDots(const string input) {
-  auto inp = split(input, '/');
-  vector<string> s;
-  for (auto &i : inp) {
-    if (i == "..") {
-      s.pop_back();
-    } else if (i != ".") {
-      s.push_back(i);
-    }
-  }
-
+  auto slashIdx = input.find("/");
   string result = "";
 
-  for (auto &p : s) {
-    result = result + "/" + p;
+  if(slashIdx == string::npos) {
+    return input;
+  }
+  else if(slashIdx == 0) {
+
+    auto inp = split(input, '/');
+    vector<string> s;
+    for (auto &i : inp) {
+      if (i == ".." && !s.empty()) {
+        s.pop_back();
+      } else if (i != ".") {
+        s.push_back(i);
+      }
+    }
+
+
+
+    for (auto &p : s) {
+      result = result + "/" + p;
+    }
+  } else {
+    return input.substr(0, slashIdx) + removeDots(input.substr(slashIdx));
   }
 
   return result;

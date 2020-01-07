@@ -14,23 +14,22 @@ void DotGenerator::header(ostream &os, bool clusters) {
   os << "digraph G {" << endl;
 }
 
-void DotGenerator::footer(ostream &os) {
+void DotGenerator::footer(ostream &os, bool clusters) {
   os << "}" << endl;
 }
 
-void DotGenerator::nodeDefinitionBegin(ostream &os) {
-  clusters.clear();
+void DotGenerator::nodeDefinitionBegin(ostream &os, bool clusters) {
+  subgraphs.clear();
 }
 
 void DotGenerator::nodeDefinition(ostream &os, shared_ptr<File> file, bool clusters) {
-  this->clusters[file->path].insert(file);
-  useClusters = clusters;
+  this->subgraphs[file->path].insert(file);
 }
 
-void DotGenerator::nodeDefinitionEnd(ostream &os) {
+void DotGenerator::nodeDefinitionEnd(ostream &os, bool clusters) {
   int clusterNum = 0;
-  for (auto &cluster : clusters) {
-    if (useClusters) {
+  for (auto &cluster : subgraphs) {
+    if (clusters) {
       os << "subgraph cluster_" << clusterNum << "{" << endl;
       os << "\tlabel = \"" << cluster.first << "\";" << endl;
     }
@@ -38,7 +37,7 @@ void DotGenerator::nodeDefinitionEnd(ostream &os) {
       string headerModifier = file->isHeader() ? "" : ", shape=box, style=filled, color=lightblue";
       os << "\t" << "\"" << file->FullPath() << "\" [ label=\"" << file->name << "\"" << headerModifier << "];" << endl;
     }
-    if (useClusters) {
+    if (clusters) {
       os << "}" << endl;
     }
     clusterNum++;

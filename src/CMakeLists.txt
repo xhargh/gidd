@@ -6,10 +6,10 @@ set(SOURCE_FILES
         gidd.cpp
         gidd_utils.cpp
         file.cpp
-        output_generator.cpp
-        dot_generator.cpp
-        plantuml_generator.cpp
-        gml_generator.cpp
+        output_generators/output_generator.cpp
+        output_generators/dot_generator.cpp
+        output_generators/plantuml_generator.cpp
+        output_generators/gml_generator.cpp
         main.cpp)
 
 add_executable(gidd ${SOURCE_FILES})
